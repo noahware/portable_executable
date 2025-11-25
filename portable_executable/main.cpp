@@ -61,6 +61,22 @@ static void run_image_tests(const portable_executable::image_t* image)
 			std::printf("(unwind code) offset: 0x%x, info: 0x%x\n", unwind_opcode.offset, unwind_opcode.info);
 		}
 	}
+
+	std::printf("parsing load config...\n");
+
+	if (const auto load_config = image->load_config())
+	{
+		std::printf("characteristics: 0x%x\n", load_config->characteristics);
+		std::printf("security cookie va: 0x%llx\n", load_config->security_cookie);
+		std::printf("process heap flags: 0x%x\n", load_config->process_heap_flags);
+		std::printf("dependent load flags: 0x%x\n", load_config->dependent_load_flags);
+		std::printf("code integrity flags: 0x%x\n", load_config->code_integrity.flags);
+		std::printf("hot patch table rva: 0x%x\n", load_config->hot_patch_table_rva);
+	}
+	else
+	{
+		std::printf("load config not present\n");
+	}
 }
 
 std::int32_t main()

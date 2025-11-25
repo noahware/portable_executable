@@ -10,6 +10,8 @@
 #include "debug_directory.hpp"
 #include "exception_directory.hpp"
 #include "delay_load_directory.hpp"
+#include "load_config_directory.hpp"
+#include "resource_directory.hpp"
 
 #include <optional>
 #include <vector>
@@ -323,6 +325,34 @@ namespace portable_executable
 			auto module = reinterpret_cast<const std::uint8_t*>(this);
 
 			return { module, data_directory.virtual_address, data_directory.size };
+		}
+
+		[[nodiscard]] load_config_directory_t* load_config()
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.load_config_directory;
+
+			if (!data_directory.present())
+			{
+				return nullptr;
+			}
+
+			const auto module = reinterpret_cast<std::uint8_t*>(this);
+
+			return reinterpret_cast<load_config_directory_t*>(module + data_directory.virtual_address);
+		}
+
+		[[nodiscard]] const load_config_directory_t* load_config() const
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.load_config_directory;
+
+			if (!data_directory.present())
+			{
+				return nullptr;
+			}
+
+			const auto module = reinterpret_cast<const std::uint8_t*>(this);
+
+			return reinterpret_cast<const load_config_directory_t*>(module + data_directory.virtual_address);
 		}
 
 		section_header_t* find_section(std::string_view name);

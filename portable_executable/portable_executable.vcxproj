@@ -108,6 +108,7 @@
     <ClInclude Include="portable_executable\file_header.hpp" />
     <ClInclude Include="portable_executable\image.hpp" />
     <ClInclude Include="portable_executable\imports_directory.hpp" />
+    <ClInclude Include="portable_executable\load_config_directory.hpp" />
     <ClInclude Include="portable_executable\nt_headers.hpp" />
     <ClInclude Include="portable_executable\optional_header.hpp" />
     <ClInclude Include="portable_executable\relocations_directory.hpp" />

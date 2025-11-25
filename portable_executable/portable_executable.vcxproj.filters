@@ -89,5 +89,8 @@
     <ClInclude Include="portable_executable\delay_load_directory.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="portable_executable\load_config_directory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
