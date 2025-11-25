@@ -9,6 +9,7 @@
 #include "relocations_directory.hpp"
 #include "debug_directory.hpp"
 #include "exception_directory.hpp"
+#include "delay_load_directory.hpp"
 
 #include <vector>
 
@@ -142,7 +143,7 @@ namespace portable_executable
 			return { module, names, functions, ordinals, export_directory->number_of_names };
 		}
 
-		imports_range_t<imports_iterator_t> imports()
+		imports_range_t<imports_iterator_t<import_descriptor_t>> imports()
 		{
 			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.import_directory;
 
@@ -156,9 +157,37 @@ namespace portable_executable
 			return { module, data_directory.virtual_address };
 		}
 
-		[[nodiscard]] imports_range_t<const imports_iterator_t> imports() const
+		[[nodiscard]] imports_range_t<const imports_iterator_t<import_descriptor_t>> imports() const
 		{
 			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.import_directory;
+
+			if (!data_directory.present())
+			{
+				return { };
+			}
+
+			auto module = reinterpret_cast<const std::uint8_t*>(this);
+
+			return { module, data_directory.virtual_address };
+		}
+
+		imports_range_t<imports_iterator_t<delay_load_descriptor_t>> delay_imports()
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.delay_import_directory;
+
+			if (!data_directory.present())
+			{
+				return { };
+			}
+
+			auto module = reinterpret_cast<std::uint8_t*>(this);
+
+			return { module, data_directory.virtual_address };
+		}
+
+		[[nodiscard]] imports_range_t<const imports_iterator_t<delay_load_descriptor_t>> delay_imports() const
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.delay_import_directory;
 
 			if (!data_directory.present())
 			{

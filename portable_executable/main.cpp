@@ -27,6 +27,13 @@ static void run_image_tests(const portable_executable::image_t* image)
 		std::printf("%s!%s -> 0x%p\n", module_name.c_str(), import_name.c_str(), address);
 	}
 
+	std::printf("iterating delay imports...\n");
+
+	for (const auto& [module_name, import_name, address] : image->delay_imports())
+	{
+		std::printf("%s!%s -> 0x%p\n", module_name.c_str(), import_name.c_str(), address);
+	}
+
 	std::printf("iterating relocations...\n");
 
 	for (const auto [relocation_block, relocation_block_va] : image->relocations())

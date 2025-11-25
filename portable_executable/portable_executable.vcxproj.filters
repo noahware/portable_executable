@@ -36,9 +36,6 @@
     <ClCompile Include="portable_executable\data_directory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="portable_executable\imports_directory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="portable_executable\relocations_directory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -87,6 +84,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="portable_executable\exception_directory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="portable_executable\delay_load_directory.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
