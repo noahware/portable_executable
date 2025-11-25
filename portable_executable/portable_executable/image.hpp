@@ -11,6 +11,7 @@
 #include "exception_directory.hpp"
 #include "delay_load_directory.hpp"
 
+#include <optional>
 #include <vector>
 
 namespace portable_executable
@@ -56,6 +57,43 @@ namespace portable_executable
 
 			return address + (alignment - remainder);
 		}
+
+		[[nodiscard]] std::optional<std::uint32_t> rva_to_ptr(const std::uint32_t rva) const
+		{
+			for (const auto& section : sections())
+			{
+				const std::uint32_t section_start = section.virtual_address;
+				const std::uint32_t section_end = section_start + section.virtual_size;
+
+				if (section_start <= rva && rva < section_end)
+				{
+					const std::uint32_t offset = rva - section_start;
+
+					return section.pointer_to_raw_data + offset;
+				}
+			}
+
+			return std::nullopt;
+		}
+
+		[[nodiscard]] std::optional<std::uint32_t> ptr_to_rva(const std::uint32_t ptr) const
+		{
+			for (const auto& section : sections())
+			{
+				const std::uint32_t section_start = section.pointer_to_raw_data;
+				const std::uint32_t section_end = section_start + section.size_of_raw_data;
+
+				if (section_start <= ptr && ptr < section_end)
+				{
+					const std::uint32_t offset = ptr - section_start;
+
+					return section.virtual_address + offset;
+				}
+			}
+
+			return std::nullopt;
+		}
+
 
 		std::vector<std::uint8_t> add_section(std::string_view name, std::uint32_t size, std::uint32_t characteristics, bool is_image_decompressed = false)
 		{
