@@ -112,6 +112,20 @@ namespace portable_executable
 
 			portable_executable::section_header_t* new_section_header = reinterpret_cast<portable_executable::section_header_t*>(reinterpret_cast<std::uint64_t>(&last_section_header->characteristics) + 4);
 
+			// size_of_headers must never grow. It has to stay below the first
+			// section's address, and when file_alignment equals section_alignment
+			// (0x1000) even a single 40-byte header rounds up a whole page, which
+			// pushes it over that section and the loader refuses the image. The
+			// new header has to fit in the slack that is already there.
+			const std::uint64_t new_header_end = reinterpret_cast<std::uint64_t>(new_section_header)
+				+ sizeof(portable_executable::section_header_t)
+				- reinterpret_cast<std::uint64_t>(this);
+
+			if (new_header_end > nt_headers->optional_header.size_of_headers)
+			{
+				return { };
+			}
+
 			memcpy(new_section_header, name.data(), name.size());
 
 			new_section_header->virtual_address = calculate_alignment(last_section_header->virtual_address + last_section_header->virtual_size, nt_headers->optional_header.section_alignment);
