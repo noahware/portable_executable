@@ -4,6 +4,12 @@
 #include <string>
 #include <iterator>
 #include <optional>
+#include <vector>
+#include <span>
+#include <cstring>
+#include <unordered_map>
+#include <string_view>
+#include <algorithm>
 
 namespace portable_executable
 {
@@ -71,7 +77,9 @@ namespace portable_executable
 
         bool is_ordinal;
 
-        std::uint8_t*& address;
+        // RVA of this import's slot in the image's import address table. Zero
+        // for a synthesised entry that has no existing table.
+        std::uint32_t iat_slot_rva;
 
         // Empty when the import is by ordinal -- such an import carries no name.
         [[nodiscard]] std::string import_name() const
@@ -140,10 +148,13 @@ namespace portable_executable
 
             const std::string module_name(reinterpret_cast<const char*>(this->m_module + this->m_current_descriptor->get_name()));
 
-            auto* import_addr_ref = const_cast<std::uint64_t*>(&this->m_current_thunk->function);
-            auto& import_addr = *reinterpret_cast<std::uint8_t**>(import_addr_ref);
+            // Where this import's IAT slot lives, relative to the image base.
+            // Rebuilding the directory needs it to keep descriptors pointing at
+            // the table the compiled call sites already reference.
+            const auto iat_slot_rva = static_cast<std::uint32_t>(
+                reinterpret_cast<const std::uint8_t*>(this->m_current_thunk) - this->m_module);
 
-            return { module_name, name, ordinal_value, is_ordinal, import_addr };
+            return { module_name, name, ordinal_value, is_ordinal, iat_slot_rva };
         }
 
         imports_iterator_t& operator++()
