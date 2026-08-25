@@ -11,6 +11,7 @@
 #include "exception_directory.hpp"
 #include "delay_load_directory.hpp"
 #include "load_config_directory.hpp"
+#include "tls_directory.hpp"
 
 #include <optional>
 #include <vector>
@@ -365,6 +366,34 @@ namespace portable_executable
 			const auto module = reinterpret_cast<const std::uint8_t*>(this);
 
 			return reinterpret_cast<const load_config_directory_t*>(module + data_directory.virtual_address);
+		}
+
+		[[nodiscard]] tls_directory_t* tls()
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.tls_directory;
+
+			if (!data_directory.present())
+			{
+				return nullptr;
+			}
+
+			const auto module = reinterpret_cast<std::uint8_t*>(this);
+
+			return reinterpret_cast<tls_directory_t*>(module + data_directory.virtual_address);
+		}
+
+		[[nodiscard]] const tls_directory_t* tls() const
+		{
+			data_directory_t data_directory = this->nt_headers()->optional_header.data_directories.tls_directory;
+
+			if (!data_directory.present())
+			{
+				return nullptr;
+			}
+
+			const auto module = reinterpret_cast<const std::uint8_t*>(this);
+
+			return reinterpret_cast<const tls_directory_t*>(module + data_directory.virtual_address);
 		}
 
 		section_header_t* find_section(std::string_view name);
