@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <iterator>
+#include <optional>
 
 namespace portable_executable
 {
@@ -61,8 +62,34 @@ namespace portable_executable
     struct import_entry_t
     {
         std::string module_name;
-        std::string import_name;
+
+        // Set for a name import, empty for an ordinal import.
+        std::string name;
+
+        // Set for an ordinal import, zero for a name import.
+        std::uint16_t ordinal_value;
+
+        bool is_ordinal;
+
         std::uint8_t*& address;
+
+        // Empty when the import is by ordinal -- such an import carries no name.
+        [[nodiscard]] std::string import_name() const
+        {
+            return this->name;
+        }
+
+        // Nullopt when the import is by name. This is the form GetProcAddress
+        // accepts, via MAKEINTRESOURCE.
+        [[nodiscard]] std::optional<std::uint16_t> ordinal() const
+        {
+            if (!this->is_ordinal)
+            {
+                return std::nullopt;
+            }
+
+            return this->ordinal_value;
+        }
     };
 
     template<typename T>
@@ -93,17 +120,22 @@ namespace portable_executable
 
         value_type operator*() const
         {
-            std::string import_name;
+            std::string name;
+            std::uint16_t ordinal_value = 0;
 
-            if (this->m_original_thunk->is_ordinal)
+            const bool is_ordinal = this->m_original_thunk->is_ordinal;
+
+            if (is_ordinal)
             {
-                import_name = reinterpret_cast<const char*>(this->m_module + this->m_original_thunk->ordinal);
+                // An ordinal import has no name string. The low 16 bits are the
+                // ordinal number itself, not an RVA, so it must not be dereferenced.
+                ordinal_value = static_cast<std::uint16_t>(this->m_original_thunk->ordinal);
             }
             else
             {
                 const auto import_by_name = reinterpret_cast<const import_by_name_t*>(this->m_module + this->m_original_thunk->address);
 
-                import_name = import_by_name->name;
+                name = import_by_name->name;
             }
 
             const std::string module_name(reinterpret_cast<const char*>(this->m_module + this->m_current_descriptor->get_name()));
@@ -111,7 +143,7 @@ namespace portable_executable
             auto* import_addr_ref = const_cast<std::uint64_t*>(&this->m_current_thunk->function);
             auto& import_addr = *reinterpret_cast<std::uint8_t**>(import_addr_ref);
 
-            return { module_name, import_name, import_addr };
+            return { module_name, name, ordinal_value, is_ordinal, import_addr };
         }
 
         imports_iterator_t& operator++()

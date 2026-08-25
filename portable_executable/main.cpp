@@ -22,16 +22,30 @@ static void run_image_tests(const portable_executable::image_t* image)
 
 	std::printf("iterating imports...\n");
 
-	for (const auto& [module_name, import_name, address] : image->imports())
+	for (const auto& import : image->imports())
 	{
-		std::printf("%s!%s -> 0x%p\n", module_name.c_str(), import_name.c_str(), address);
+		if (const auto ordinal = import.ordinal())
+		{
+			std::printf("%s!#%u -> 0x%p\n", import.module_name.c_str(), *ordinal, import.address);
+		}
+		else
+		{
+			std::printf("%s!%s -> 0x%p\n", import.module_name.c_str(), import.import_name().c_str(), import.address);
+		}
 	}
 
 	std::printf("iterating delay imports...\n");
 
-	for (const auto& [module_name, import_name, address] : image->delay_imports())
+	for (const auto& import : image->delay_imports())
 	{
-		std::printf("%s!%s -> 0x%p\n", module_name.c_str(), import_name.c_str(), address);
+		if (const auto ordinal = import.ordinal())
+		{
+			std::printf("%s!#%u -> 0x%p\n", import.module_name.c_str(), *ordinal, import.address);
+		}
+		else
+		{
+			std::printf("%s!%s -> 0x%p\n", import.module_name.c_str(), import.import_name().c_str(), import.address);
+		}
 	}
 
 	std::printf("iterating relocations...\n");
@@ -66,7 +80,7 @@ static void run_image_tests(const portable_executable::image_t* image)
 
 	if (const auto load_config = image->load_config())
 	{
-		std::printf("characteristics: 0x%x\n", load_config->characteristics);
+		std::printf("size: 0x%x\n", load_config->size);
 		std::printf("security cookie va: 0x%llx\n", load_config->security_cookie);
 		std::printf("process heap flags: 0x%x\n", load_config->process_heap_flags);
 		std::printf("dependent load flags: 0x%x\n", load_config->dependent_load_flags);
