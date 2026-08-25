@@ -5,6 +5,7 @@
 #include <iterator>
 #include <optional>
 #include <vector>
+#include <ranges>
 #include <span>
 #include <cstring>
 #include <unordered_map>
@@ -232,4 +233,147 @@ namespace portable_executable
             return { this->m_module, nullptr };
         }
     };
+
+    // Builds an import directory for placement at dir_rva. Descriptors, thunks
+    // and name entries all reference each other by RVA, so the blob is only
+    // valid at the address it was built for.
+    //
+    // first_thunk comes from iat_slot_rva, keeping descriptors pointed at the
+    // table the image's code already calls through. No new IAT is allocated.
+    //
+    // The loader pairs thunk i with the slot at first_thunk + i * 8, so a thunk
+    // is placed by its slot rva rather than by its position in the input. Order
+    // therefore does not matter, but a module's slots must be contiguous: a gap
+    // leaves a zero thunk, which terminates the array early.
+    [[nodiscard]] inline std::pair<std::uint32_t, std::vector<std::uint8_t>> build_imports_directory(const std::span<const import_entry_t> imports, const std::uint32_t rva)
+    {
+        std::vector<std::uint8_t> bytes;
+
+        const auto insert = [&]<typename T>(const T & v) -> std::uint32_t
+        {
+            const auto old_size = static_cast<std::uint32_t>(bytes.size());
+
+            if constexpr (std::ranges::contiguous_range<T>)
+            {
+                using value_t = std::ranges::range_value_t<T>;
+                static_assert(std::is_trivially_copyable_v<value_t>);
+
+                const auto* base = reinterpret_cast<const std::uint8_t*>(std::ranges::data(v));
+
+                bytes.insert(bytes.end(), base,
+                    base + std::ranges::size(v) * sizeof(value_t));
+            }
+            else
+            {
+                static_assert(std::is_trivially_copyable_v<T>);
+
+                const auto* base = reinterpret_cast<const std::uint8_t*>(&v);
+
+                bytes.insert(bytes.end(), base, base + sizeof(T));
+            }
+
+            return rva + old_size;
+        };
+
+        struct module_info
+        {
+            std::vector<const import_entry_t*> imps;
+        };
+
+        std::unordered_map<std::string, module_info> modules;
+
+        for (const auto& imp : imports)
+        {
+            auto& mod = modules[imp.module_name];
+
+            mod.imps.push_back(&imp);
+        }
+        
+        for (auto& mod : modules | std::views::values)
+        {
+            std::ranges::sort(mod.imps, {}, &import_entry_t::iat_slot_rva);
+        }
+    	
+        const auto is_contiguous = [](const import_entry_t* a, const import_entry_t* b)
+            {
+                const std::uint32_t expected_next_rva = a->iat_slot_rva + sizeof(std::uint64_t);
+
+                return b->iat_slot_rva == expected_next_rva;
+            };
+
+        const auto make_desc = [&](const std::string& mod_name, const std::span<const import_entry_t*> entries) -> import_descriptor_t
+            {
+                if (entries.empty())
+                {
+                    return { };
+                }
+
+                import_descriptor_t d;
+
+                const std::uint32_t name_rva = insert(std::span{ mod_name.c_str(), mod_name.size() + 1 });
+
+                std::vector<std::uint32_t> ints;
+                ints.reserve(entries.size() + 1);
+
+                for (const auto e : entries)
+                {
+                    // import_by_name_t
+                    std::uint16_t hint = 0;
+
+                    ints.push_back(insert(hint));
+	                insert(std::span{ e->name.c_str(), e->name.size() + 1 });
+                }
+
+                ints.push_back(0);
+
+                d.name = name_rva;
+                d.time_date_stamp = 0;
+                d.forwarder_chain = 0;
+                d.first_thunk = entries[0]->iat_slot_rva;
+                d.misc.original_first_thunk = insert(ints);
+
+                return d;
+            };
+
+        std::vector<import_descriptor_t> descriptors;
+        descriptors.reserve(modules.size());
+
+        for (auto& [name, info] : modules)
+        {
+            std::vector<const import_entry_t*> pending_imps;
+
+            const auto flush = [&]()
+                {
+                    if (pending_imps.empty())
+                    {
+                        return;
+                    }
+
+                    descriptors.push_back(make_desc(name, pending_imps));
+                };
+
+            const import_entry_t* last = nullptr;
+
+	        while (!info.imps.empty())
+	        {
+                const auto curr = info.imps.back();
+                info.imps.pop_back();
+
+                if (last != nullptr && is_contiguous(last, curr))
+                {
+                    flush();
+                    pending_imps.clear();
+                }
+
+                pending_imps.push_back(curr);
+                last = curr;
+	        }
+
+            flush();
+        }
+
+        const std::uint32_t dir_rva = insert(descriptors);
+
+        return { dir_rva, bytes };
+    }
 }
