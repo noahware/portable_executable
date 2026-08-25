@@ -275,6 +275,13 @@ namespace portable_executable
             return rva + old_size;
         };
 
+        // Pads so the next insert lands on a boundary. rva itself is expected to
+        // be section aligned, so aligning the offset aligns the resulting rva.
+        const auto align = [&](const std::size_t alignment)
+        {
+            bytes.resize((bytes.size() + alignment - 1) & ~(alignment - 1));
+        };
+
         struct module_info
         {
             std::vector<const import_entry_t*> imps;
@@ -301,7 +308,7 @@ namespace portable_executable
                 return b->iat_slot_rva == expected_next_rva;
             };
 
-        const auto make_desc = [&](const std::string& mod_name, const std::span<const import_entry_t*> entries) -> import_descriptor_t
+        const auto make_desc = [&](const std::uint32_t name_rva, const std::span<const import_entry_t*> entries) -> import_descriptor_t
             {
                 if (entries.empty())
                 {
@@ -310,21 +317,38 @@ namespace portable_executable
 
                 import_descriptor_t d;
 
-                const std::uint32_t name_rva = insert(std::span{ mod_name.c_str(), mod_name.size() + 1 });
-
-                std::vector<std::uint32_t> ints;
+                // Thunks are pointer sized, not 32 bit.
+                std::vector<std::uint64_t> ints;
                 ints.reserve(entries.size() + 1);
 
                 for (const auto e : entries)
                 {
-                    // import_by_name_t
-                    std::uint16_t hint = 0;
+                    if (e->is_ordinal)
+                    {
+                        // An ordinal import has no name entry, just the ordinal
+                        // with the high bit set.
+                        thunk_data_t thunk = { };
+
+                        thunk.ordinal = e->ordinal_value;
+                        thunk.is_ordinal = 1;
+
+                        ints.push_back(thunk.address);
+
+                        continue;
+                    }
+
+                    // import_by_name_t leads with a WORD hint
+                    align(sizeof(std::uint16_t));
+
+                    const std::uint16_t hint = 0;
 
                     ints.push_back(insert(hint));
-	                insert(std::span{ e->name.c_str(), e->name.size() + 1 });
+                    insert(std::span{ e->name.c_str(), e->name.size() + 1 });
                 }
 
                 ints.push_back(0);
+
+                align(alignof(thunk_data_t));
 
                 d.name = name_rva;
                 d.time_date_stamp = 0;
@@ -340,37 +364,37 @@ namespace portable_executable
 
         for (auto& [name, info] : modules)
         {
-            std::vector<const import_entry_t*> pending_imps;
+            // Every run of this module shares the one name string.
+            const std::uint32_t name_rva = insert(std::span{ name.c_str(), name.size() + 1 });
 
-            const auto flush = [&]()
+            // One descriptor per contiguous run of slots. Walking the sorted
+            // entries forward keeps thunk i paired with first_thunk + i * 8, and
+            // a break in the run starts a new descriptor rather than leaving a
+            // hole that would terminate the thunk array early.
+            std::vector<const import_entry_t*> run;
+
+            for (const import_entry_t* curr : info.imps)
+            {
+                if (!run.empty() && !is_contiguous(run.back(), curr))
                 {
-                    if (pending_imps.empty())
-                    {
-                        return;
-                    }
+                    descriptors.push_back(make_desc(name_rva, run));
 
-                    descriptors.push_back(make_desc(name, pending_imps));
-                };
-
-            const import_entry_t* last = nullptr;
-
-	        while (!info.imps.empty())
-	        {
-                const auto curr = info.imps.back();
-                info.imps.pop_back();
-
-                if (last != nullptr && is_contiguous(last, curr))
-                {
-                    flush();
-                    pending_imps.clear();
+                    run.clear();
                 }
 
-                pending_imps.push_back(curr);
-                last = curr;
-	        }
+                run.push_back(curr);
+            }
 
-            flush();
+            if (!run.empty())
+            {
+                descriptors.push_back(make_desc(name_rva, run));
+            }
         }
+
+        // The loader walks descriptors until an all zero one.
+        descriptors.push_back({ });
+
+        align(alignof(std::uint32_t));
 
         const std::uint32_t dir_rva = insert(descriptors);
 
