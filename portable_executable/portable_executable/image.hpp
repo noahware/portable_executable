@@ -11,7 +11,6 @@
 #include "exception_directory.hpp"
 #include "delay_load_directory.hpp"
 #include "load_config_directory.hpp"
-#include "resource_directory.hpp"
 
 #include <optional>
 #include <vector>
@@ -149,7 +148,6 @@ namespace portable_executable
 			}
 
 			new_image->nt_headers()->optional_header.size_of_image = calculate_alignment(new_image->nt_headers()->optional_header.size_of_image + size + 5 + static_cast<std::uint32_t>(sizeof(portable_executable::section_header_t)), nt_headers->optional_header.section_alignment);
-			new_image->nt_headers()->optional_header.size_of_headers = calculate_alignment(new_image->nt_headers()->optional_header.size_of_headers + static_cast<std::uint32_t>(sizeof(portable_executable::section_header_t)), nt_headers->optional_header.file_alignment);
 			new_image->nt_headers()->file_header.number_of_sections++;
 
 			binary_snapshot.resize(new_image->nt_headers()->optional_header.size_of_image);
