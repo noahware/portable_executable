@@ -1,9 +1,40 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 namespace portable_executable
 {
+    union load_config_guard_flags_t
+    {
+        struct
+        {
+            std::uint32_t _pad0 : 8;
+            std::uint32_t cf_instrumented : 1;
+            std::uint32_t cfw_instrumented : 1;
+            std::uint32_t cf_function_table_present : 1;
+            std::uint32_t security_cookie_unused : 1;
+            std::uint32_t protect_delayload_iat : 1;
+            std::uint32_t delayload_iat_in_its_own_section : 1;
+            std::uint32_t cf_export_suppression_info_present : 1;
+            std::uint32_t cf_enable_export_suppression : 1;
+            std::uint32_t cf_longjump_table_present : 1;
+            std::uint32_t rf_instrumented : 1;
+            std::uint32_t rf_enable : 1;
+            std::uint32_t rf_strict : 1;
+            std::uint32_t retpoline_present : 1;
+            std::uint32_t _pad1 : 1;
+            std::uint32_t eh_continuation_table_present : 1;
+            std::uint32_t xfg_enabled : 1;
+            std::uint32_t castguard_present : 1;
+            std::uint32_t memcpy_present : 1;
+            std::uint32_t _pad2 : 2;
+            std::uint32_t cf_function_table_size : 4;
+        };
+
+        std::uint32_t flags;
+    };
+
     struct load_config_code_integrity_t
     {
         std::uint16_t flags;
@@ -22,7 +53,7 @@ namespace portable_executable
             value_type size;
         };
 
-        std::uint32_t characteristics;
+        std::uint32_t size;
         std::uint32_t time_date_stamp;
         std::uint16_t major_version;
         std::uint16_t minor_version;
@@ -44,7 +75,7 @@ namespace portable_executable
         value_type guard_cf_check_function_pointer;
         value_type guard_cf_dispatch_function_pointer;
         table_t guard_cf_function_table;
-        std::uint32_t guard_flags;
+        load_config_guard_flags_t guard_flags;
         load_config_code_integrity_t code_integrity;
         table_t guard_address_taken_iat_entry_table;
         table_t guard_long_jump_target_table;
@@ -68,4 +99,8 @@ namespace portable_executable
         value_type guard_memcpy_function_pointer;
         value_type uma_function_pointers;
     };
+
+    static_assert(offsetof(load_config_directory_t, security_cookie) == 0x58);
+    static_assert(offsetof(load_config_directory_t, guard_cf_function_table) == 0x80);
+    static_assert(offsetof(load_config_directory_t, guard_flags) == 0x90);
 }
